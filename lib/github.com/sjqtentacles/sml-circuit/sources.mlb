@@ -1,0 +1,9 @@
+(* Source files for sml-circuit, in dependency order. Pulls in the vendored
+   sml-prng sources (SplitMix64 used for Retry jitter). *)
+
+$(SML_LIB)/basis/basis.mlb
+
+../sml-prng/prng.mlb
+
+circuit.sig
+circuit.sml

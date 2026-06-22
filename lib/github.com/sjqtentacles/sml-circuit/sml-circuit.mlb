@@ -1,0 +1,7 @@
+(* sml-circuit: public library basis. Re-exports the vendored sml-prng
+   plus the circuit sources, so a consumer gets the resilience
+   structures. *)
+
+$(SML_LIB)/basis/basis.mlb
+
+sources.mlb

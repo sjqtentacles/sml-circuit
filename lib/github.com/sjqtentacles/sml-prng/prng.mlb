@@ -1,0 +1,7 @@
+(* MLton basis file for the sml-prng library. *)
+local
+  $(SML_LIB)/basis/basis.mlb
+in
+  prng.sig
+  prng.sml
+end
