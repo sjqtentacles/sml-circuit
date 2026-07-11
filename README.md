@@ -73,6 +73,41 @@ val (bk', tok) = valOf (Circuit.Bulkhead.acquire bk)
 val bk'' = Circuit.Bulkhead.release (bk', tok)
 ```
 
+## Example
+
+`make example` builds and runs [`examples/demo.sml`](examples/demo.sml), which
+drives a CircuitBreaker through a full trip-and-recover cycle, computes four
+Retry backoff delays from a fixed seed, steps a RateLimiter token bucket
+across three ticks, and exercises a Bulkhead's acquire/release accounting
+(output is byte-identical under MLton and Poly/ML):
+
+```
+CircuitBreaker (failureThreshold=3, resetTimeout=2):
+  tick 1: role=Closed action=Allow
+  tick 2: role=Closed action=Allow
+  tick 3: role=Open(3) action=Reject
+  tick 4: role=Open(3) action=Reject
+  tick 5: role=HalfOpen action=Probe
+  tick 6: role=Closed action=Allow
+
+Retry backoff (baseDelayMs=100, maxDelayMs=2000, jitterFactor=0.5):
+  attempt 1: delay = 57ms
+  attempt 2: delay = 153ms
+  attempt 3: delay = 391ms
+  attempt 4: delay = 541ms
+  exhausted(4)  = true
+
+RateLimiter token bucket (capacity=5, refillPerTick=1.0):
+  tick 0 request 3  -> granted 3, available 2.0
+  tick 2 request 2  -> granted 2, available 2.0
+  tick 5 request 10 -> granted 5, available 0.0
+
+Bulkhead (2 slots):
+  acquired tokens 0,1; active=2/2
+  acquire when full -> NONE
+  release 0, then acquire -> token 0; active=2
+```
+
 ## Building and testing
 
 ```sh
