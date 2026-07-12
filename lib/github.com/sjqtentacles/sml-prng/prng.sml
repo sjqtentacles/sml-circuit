@@ -44,15 +44,39 @@ struct
     else if lo = hi then (lo, s)
     else
       let
-        (* span = hi - lo + 1, as Word64; safe since ints fit in 63 bits *)
-        val span = W.fromInt (hi - lo) + 0w1
+        (* span = hi - lo + 1, computed in IntInf (arbitrary precision, never
+           overflows) and then widened to Word64. Two platform traps to
+           avoid here: (1) computing `hi - lo` in native SML int first
+           overflows on MLton (~31/32-bit default int) for wide ranges
+           (e.g. ~2000000000 to 2000000000) while Poly/ML's ~63-bit default
+           int accepts the same call -- a cross-compiler divergence. (2)
+           Widening a *negative* int straight to Word64 via `Word64.fromInt`
+           is fine on MLton and Poly/ML 5.9+, but Poly/ML 5.7.1 (the apt
+           package used by some CI images) has a genuine bug there: it
+           drops the sign/top bit, e.g. `Word64.fromInt ~1` yields
+           `0x7FFF...FFFF` instead of all-Fs. Routing the subtraction
+           through IntInf sidesteps both: IntInf arithmetic never overflows,
+           and `span` (= hi - lo + 1) is always non-negative once computed,
+           so the only Word64 conversion is `fromLargeInt` of a
+           non-negative value, which is safe everywhere. *)
+        val span = W.fromLargeInt (IntInf.fromInt hi - IntInf.fromInt lo + 1)
         (* largest multiple of span that fits; reject above it *)
         val limit = W.- (0w0, W.mod (W.- (0w0, span), span))  (* = floor(2^64/span)*span *)
         fun loop s =
           let val (w, s') = next s
           in if span <> 0w0 andalso W.> (w, W.- (limit, 0w1))
              then loop s'
-             else (lo + W.toInt (W.mod (w, span)), s')
+             (* result = lo + offset, offset in [0, span-1] = [0, hi-lo].
+                For a range wider than the native int (span > maxInt, e.g.
+                ~2000000000..2000000000 where each endpoint fits in a 32-bit
+                int but their difference does not), the offset alone exceeds
+                MLton's 32-bit maxInt, so `W.toInt (W.mod ...)` would raise
+                Overflow even though the final lo+offset lands back in
+                [lo,hi] and fits. Add in IntInf and convert the final
+                (in-range) result once: never overflows, byte-identical to
+                the old `lo + W.toInt ...` for every range that worked. *)
+             else (IntInf.toInt (IntInf.fromInt lo
+                                 + W.toLargeInt (W.mod (w, span))), s')
           end
       in
         loop s
